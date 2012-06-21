@@ -77,9 +77,28 @@ public class KolmapoidActivity extends MapActivity {
 		mapView.getOverlays().add(new MyOverlay());
 		updatePlaces();
 	}
-	
+
 	private GeoPoint getCenter() {
-		return mapView.getProjection().fromPixels(mapView.getWidth()/2, mapView.getHeight()/2);
+		return mapView.getMapCenter();
+	}
+
+	static public int getDistance(GeoPoint p1, GeoPoint p2) {
+		float distance[] = { 0 };
+		Location.distanceBetween(
+				(double) (p1.getLatitudeE6()) / (double) (1e6),
+				(double) (p1.getLongitudeE6()) / (double) (1e6),
+				(double) (p2.getLatitudeE6()) / (double) (1e6),
+				(double) (p2.getLongitudeE6()) / (double) (1e6), distance);
+		return (int) (distance[0]);
+	}
+
+	private int getRadius() {
+		GeoPoint topLeftPoint = mapView.getProjection().fromPixels(0, 0);
+		GeoPoint currentPoint = getCenter();
+		int radius = getDistance(topLeftPoint, currentPoint);
+		Log.d(TAG, "Center: "+mapView.getMapCenter());
+		Log.d(TAG, "getRadius: " + radius);
+		return radius;
 	}
 
 	@Override
@@ -124,8 +143,9 @@ public class KolmapoidActivity extends MapActivity {
 				Toast.LENGTH_SHORT);
 		toast.show();
 
+		GeoPoint center = getCenter();
 		UpdatePlacesTask task = new UpdatePlacesTask(this,
-				location.getLatitude(), location.getLongitude(), 20);
+				center.getLatitudeE6()/1000000.0, center.getLongitudeE6()/1000000.0, getRadius());
 		Object params[] = { places, placesLock };
 		task.execute(params);
 	}
@@ -135,28 +155,7 @@ public class KolmapoidActivity extends MapActivity {
 		int actionType = ev.getAction();
 		switch (actionType) {
 		case MotionEvent.ACTION_UP:
-			Projection proj = mapView.getProjection();
-			GeoPoint loc = proj.fromPixels((int) ev.getX(), (int) ev.getY());
-			Log.d(TAG,
-					"X: " + Float.toString(ev.getX()) + " y: "
-							+ Float.toString(ev.getY()));
-			String sirina = Double
-					.toString((double) (loc.getLongitudeE6()) / 1000000.0);
-			String dolzina = Double
-					.toString((double) (loc.getLatitudeE6()) / 1000000.0);
-
-			Log.d(TAG, "Lng: " + sirina + " Lat: " + dolzina);
-			GeoPoint topLeftPoint = mapView.getProjection().fromPixels(0, 0);
-			GeoPoint currentPoint = getCenter();
-			Log.d(TAG, "From " + topLeftPoint + " to " + currentPoint);
-			float radius[] = { 0 };
-			Location.distanceBetween((double) (topLeftPoint.getLatitudeE6())
-					/ (double) (1e6), (double) (topLeftPoint.getLongitudeE6())
-					/ (double) (1e6), (double) (currentPoint.getLatitudeE6())
-					/ (double) (1e6), (double) (currentPoint.getLongitudeE6())
-					/ (double) (1e6), radius);
-			Log.d(TAG, "Distance: " + radius[0]);
-
+			updatePlaces();
 		}
 
 		return super.dispatchTouchEvent(ev);
@@ -263,24 +262,10 @@ public class KolmapoidActivity extends MapActivity {
 			try {
 				placesLock.acquire();
 				for (int i = 0; i < places.size(); i++) {
-					GeoPoint topLeftPoint = mapView.getProjection().fromPixels(
-							0, 0);
-					GeoPoint currentPoint = new GeoPoint(
-							(int) (location.getLatitude() * 1e6),
-							(int) (location.getLongitude() * 1e6));
-					// Log.d(TAG, "From " + topLeftPoint + " to " +
-					// currentPoint);
-					Location loc = locationManager
-							.getLastKnownLocation(locationManager
-									.getBestProvider(new Criteria(), false));
-
-					GeoPoint gP1 = new GeoPoint(
-							(int) (loc.getLatitude() * 1e6),
-							(int) (loc.getLongitude() * 1e6));
 					PlaceData place = places.get(i);
 
-					GeoPoint gP2 = new GeoPoint(place.getLattitude6(),
-							place.getLongitude6());
+					GeoPoint gP1 = place.getGeoPoint();
+					GeoPoint gP2 = getCenter();
 
 					Point p1 = new Point();
 					Point p2 = new Point();
@@ -295,10 +280,6 @@ public class KolmapoidActivity extends MapActivity {
 					path.lineTo(p1.x, p1.y);
 
 					canvas.drawPath(path, mPaint);
-
-					// canvas.drawRect(0, 0, canvas.getWidth(),
-					// canvas.getHeight(),
-					// mPaint);
 				}
 				placesLock.release();
 			} catch (InterruptedException e) {
