@@ -28,6 +28,7 @@ import android.util.Log;
 public class UpdatePlacesTask extends AsyncTask<Object, Object, Object> {
 	private static final String TAG = "UpdateRatesTask";
 	private static final String KEY = "AIzaSyDpZ0J_YzzI7v_BgzOCIcXnDt-GZi-yZAA";
+	private String language = "fr";
 
 	private double lattitude;
 	private double longitude;
@@ -41,7 +42,8 @@ public class UpdatePlacesTask extends AsyncTask<Object, Object, Object> {
 		return "https://maps.googleapis.com/maps/api/place/search/json?key="
 				+ KEY + "&location=" + Double.toString(lattitude) + ","
 				+ Double.toString(longitude) + "&radius="
-				+ Integer.toString(radius) + "&sensor=true";
+				+ Integer.toString(radius) + "&sensor=true&language="
+				+ language;
 	}
 
 	/**

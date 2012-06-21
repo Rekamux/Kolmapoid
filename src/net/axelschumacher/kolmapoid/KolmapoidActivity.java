@@ -53,7 +53,6 @@ public class KolmapoidActivity extends MapActivity {
 		// Configure the Map
 		mapView = (MapView) findViewById(R.id.mapview);
 		mapView.setBuiltInZoomControls(true);
-		mapView.setSatellite(true);
 		mapController = mapView.getController();
 		mapController.setZoom(20); // Zoom 1 is world view
 		locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
@@ -252,13 +251,17 @@ public class KolmapoidActivity extends MapActivity {
 		public void draw(Canvas canvas, MapView mapv, boolean shadow) {
 			super.draw(canvas, mapv, shadow);
 
-			Paint mPaint = new Paint();
-			mPaint.setDither(true);
-			mPaint.setColor(Color.argb(128, 255, 0, 0));
-			mPaint.setStyle(Paint.Style.FILL_AND_STROKE);
-			mPaint.setStrokeJoin(Paint.Join.ROUND);
-			mPaint.setStrokeCap(Paint.Cap.ROUND);
-			mPaint.setStrokeWidth(2);
+			Paint linePaint = new Paint();
+			linePaint.setDither(true);
+			linePaint.setColor(Color.argb(128, 255, 0, 0));
+			linePaint.setStyle(Paint.Style.FILL_AND_STROKE);
+			linePaint.setStrokeJoin(Paint.Join.ROUND);
+			linePaint.setStrokeCap(Paint.Cap.ROUND);
+			linePaint.setStrokeWidth(2);
+			
+			Paint textPaint = new Paint();
+			textPaint.setColor(Color.BLUE);
+			textPaint.setTextSize(20);
 
 			try {
 				placesLock.acquire();
@@ -280,7 +283,8 @@ public class KolmapoidActivity extends MapActivity {
 					path.moveTo(p2.x, p2.y);
 					path.lineTo(p1.x, p1.y);
 
-					canvas.drawPath(path, mPaint);
+					canvas.drawPath(path, linePaint);
+					canvas.drawText(place.getName(), p1.x, p1.y, textPaint);
 				}
 				placesLock.release();
 			} catch (InterruptedException e) {
