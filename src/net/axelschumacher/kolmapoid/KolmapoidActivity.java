@@ -1,5 +1,8 @@
 package net.axelschumacher.kolmapoid;
 
+import java.util.ArrayList;
+import java.util.concurrent.Semaphore;
+
 import android.app.AlertDialog;
 import android.app.AlertDialog.Builder;
 import android.content.Context;
@@ -7,12 +10,15 @@ import android.content.DialogInterface;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.Point;
 import android.graphics.drawable.Drawable;
 import android.location.Criteria;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Bundle;
+import android.util.Log;
 import android.widget.Toast;
 
 import com.google.android.maps.GeoPoint;
@@ -23,25 +29,32 @@ import com.google.android.maps.MapView;
 import com.google.android.maps.MyLocationOverlay;
 import com.google.android.maps.Overlay;
 import com.google.android.maps.OverlayItem;
+import com.google.android.maps.Projection;
 
 public class KolmapoidActivity extends MapActivity {
+	private static final String TAG = "KolmapoidActivity";
 
 	private MapController mapController;
 	private MapView mapView;
 	private LocationManager locationManager;
-	private MyOverlays itemizedoverlay;
 	private MyLocationOverlay myLocationOverlay;
+	private ArrayList<PlaceData> places;
+	private Semaphore placesLock;
+	private Projection projection;
 
 	public void onCreate(Bundle bundle) {
 		super.onCreate(bundle);
 		setContentView(R.layout.main); // bind the layout to the activity
+		places = new ArrayList<PlaceData>();
+		placesLock = new Semaphore(1);
 
 		// Configure the Map
 		mapView = (MapView) findViewById(R.id.mapview);
 		mapView.setBuiltInZoomControls(true);
 		mapView.setSatellite(true);
+		projection = mapView.getProjection();
 		mapController = mapView.getController();
-		mapController.setZoom(14); // Zoom 1 is world view
+		mapController.setZoom(20); // Zoom 1 is world view
 		locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
 		locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0,
 				0, new GeoUpdateHandler());
@@ -55,10 +68,8 @@ public class KolmapoidActivity extends MapActivity {
 						myLocationOverlay.getMyLocation());
 			}
 		});
-
-		Drawable drawable = this.getResources().getDrawable(R.drawable.point);
-		itemizedoverlay = new MyOverlays(this, drawable);
-		//createMarker();
+		
+		// createMarker();
 		mapView.getOverlays().add(new MyOverlay());
 		updatePlaces();
 	}
@@ -74,7 +85,7 @@ public class KolmapoidActivity extends MapActivity {
 			int lat = (int) (location.getLatitude() * 1E6);
 			int lng = (int) (location.getLongitude() * 1E6);
 			GeoPoint point = new GeoPoint(lat, lng);
-			//createMarker();
+			// createMarker();
 			mapController.animateTo(point); // mapController.setCenter(point);
 			updatePlaces();
 		}
@@ -89,20 +100,10 @@ public class KolmapoidActivity extends MapActivity {
 		}
 	}
 
-	private void createMarker() {
-		GeoPoint p = mapView.getMapCenter();
-		OverlayItem overlayitem = new OverlayItem(p, "", "");
-		itemizedoverlay.addOverlay(overlayitem);
-		if (itemizedoverlay.size() > 0) {
-			mapView.getOverlays().add(itemizedoverlay);
-		}
-	}
-
 	@Override
 	protected void onResume() {
 		super.onResume();
 		myLocationOverlay.enableMyLocation();
-		myLocationOverlay.enableCompass();
 	}
 
 	/**
@@ -112,17 +113,18 @@ public class KolmapoidActivity extends MapActivity {
 		Toast toast = Toast.makeText(this, R.string.start_update,
 				Toast.LENGTH_SHORT);
 		toast.show();
-		Location loc = locationManager.getLastKnownLocation(locationManager.getBestProvider(new Criteria(), false));
-		UpdatePlacesTask task = new UpdatePlacesTask(this, loc.getLatitude(), loc.getLongitude(), 100);
-		Object[] o = null;
-		task.execute(o);
+		Location loc = locationManager.getLastKnownLocation(locationManager
+				.getBestProvider(new Criteria(), false));
+		UpdatePlacesTask task = new UpdatePlacesTask(this, loc.getLatitude(),
+				loc.getLongitude(), 100);
+		Object params[] = { places, placesLock };
+		task.execute(params);
 	}
 
 	@Override
 	protected void onPause() {
 		super.onResume();
 		myLocationOverlay.disableMyLocation();
-		myLocationOverlay.disableCompass();
 	}
 
 	private static int maxNum = 5;
@@ -217,8 +219,40 @@ public class KolmapoidActivity extends MapActivity {
 			mPaint.setStrokeCap(Paint.Cap.ROUND);
 			mPaint.setStrokeWidth(2);
 
-			canvas.drawRect(0, 0, canvas.getWidth(), canvas.getHeight(), mPaint);
+			try {
+				placesLock.acquire();
+				for (int i = 0; i < places.size(); i++) {
+					Location loc = locationManager
+							.getLastKnownLocation(locationManager
+									.getBestProvider(new Criteria(), false));
+
+					GeoPoint gP1 = new GeoPoint(
+							(int) (loc.getLatitude() * 1e6),
+							(int) (loc.getLongitude() * 1e6));
+					PlaceData place = places.get(i);
+					GeoPoint gP2 = new GeoPoint(place.getLattitude6(),
+							place.getLongitude6());
+
+					Point p1 = new Point();
+					Point p2 = new Point();
+					Path path = new Path();
+
+					projection.toPixels(gP1, p1);
+					projection.toPixels(gP2, p2);
+
+					path.moveTo(p2.x, p2.y);
+					path.lineTo(p1.x, p1.y);
+
+					canvas.drawPath(path, mPaint);
+
+					// canvas.drawRect(0, 0, canvas.getWidth(),
+					// canvas.getHeight(),
+					// mPaint);
+				}
+				placesLock.release();
+			} catch (InterruptedException e) {
+				Log.d(TAG, e.getMessage());
+			}
 		}
 	}
-
 }

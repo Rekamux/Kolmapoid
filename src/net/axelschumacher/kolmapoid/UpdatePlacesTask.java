@@ -4,6 +4,8 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.concurrent.Semaphore;
 
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
@@ -27,7 +29,7 @@ import android.widget.Toast;
 public class UpdatePlacesTask extends AsyncTask<Object, Object, Object> {
 	private static final String TAG = "UpdateRatesTask";
 	private static final String KEY = "AIzaSyDpZ0J_YzzI7v_BgzOCIcXnDt-GZi-yZAA";
-	
+
 	private double lattitude;
 	private double longitude;
 	private int radius;
@@ -107,8 +109,8 @@ public class UpdatePlacesTask extends AsyncTask<Object, Object, Object> {
 					Toast.LENGTH_SHORT);
 			toast.show();
 		} else {
-			Toast toast = Toast.makeText(context, R.string.places_update_failed,
-					Toast.LENGTH_LONG);
+			Toast toast = Toast.makeText(context,
+					R.string.places_update_failed, Toast.LENGTH_LONG);
 			toast.show();
 		}
 	}
@@ -116,17 +118,27 @@ public class UpdatePlacesTask extends AsyncTask<Object, Object, Object> {
 	@Override
 	protected Object doInBackground(Object... params) {
 		Log.d(TAG, "Do in background");
+		Semaphore placesLock = null;
 		try {
+			@SuppressWarnings("unchecked")
+			ArrayList<PlaceData> places = (ArrayList<PlaceData>) params[0];
+			placesLock = (Semaphore) params[1];
+			placesLock.acquire();
 			JSONArray result = updateJSON();
 			boolean wentWell = true;
 			Log.d(TAG, result.length() + " places found");
-			for (int i=0; i<result.length(); i++) {
+			for (int i = 0; i < result.length(); i++) {
 				String placeName = "Unknown place";
 				// Update places list for each result
 				try {
 					JSONObject place = result.getJSONObject(i);
 					placeName = place.getString("name");
 					Log.d(TAG, "Treating place " + placeName);
+					JSONObject geometry = place.getJSONObject("geometry");
+					JSONObject location = geometry.getJSONObject("location");
+					double lat = location.getDouble("lat");
+					double lng = location.getDouble("lng");
+					places.add(new PlaceData(placeName, lat, lng));
 					Log.d(TAG, "Treated " + placeName);
 				} catch (Exception e) {
 					// To keep on getting the other values
@@ -135,8 +147,12 @@ public class UpdatePlacesTask extends AsyncTask<Object, Object, Object> {
 					Log.d(TAG, "Reason: " + e.getMessage());
 				}
 			}
+			placesLock.release();
 			return Boolean.valueOf(wentWell);
 		} catch (Exception e) {
+			if (placesLock != null) {
+				placesLock.release();
+			}
 			Log.d(TAG, e.getMessage());
 			return Boolean.FALSE;
 		}
