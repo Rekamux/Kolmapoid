@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <string name="hello">Hello World, KolmapoidActivity!</string>
     <string name="app_name">Kolmapoid</string>
+    <string name="places_update_done">Done looking for places</string>
+    <string name="places_update_failed">Failed to find places</string>
+    <string name="start_update">Starting update...</string>
 
 </resources>
