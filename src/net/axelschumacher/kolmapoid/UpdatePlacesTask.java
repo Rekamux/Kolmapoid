@@ -124,6 +124,7 @@ public class UpdatePlacesTask extends AsyncTask<Object, Object, Object> {
 			ArrayList<PlaceData> places = (ArrayList<PlaceData>) params[0];
 			placesLock = (Semaphore) params[1];
 			placesLock.acquire();
+			places.clear();
 			JSONArray result = updateJSON();
 			boolean wentWell = true;
 			Log.d(TAG, result.length() + " places found");

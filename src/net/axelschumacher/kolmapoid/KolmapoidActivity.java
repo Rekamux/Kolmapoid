@@ -19,6 +19,7 @@ import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.MotionEvent;
 import android.widget.Toast;
 
 import com.google.android.maps.GeoPoint;
@@ -37,10 +38,10 @@ public class KolmapoidActivity extends MapActivity {
 	private MapController mapController;
 	private MapView mapView;
 	private LocationManager locationManager;
+	private Location location;
 	private MyLocationOverlay myLocationOverlay;
 	private ArrayList<PlaceData> places;
 	private Semaphore placesLock;
-	private Projection projection;
 
 	public void onCreate(Bundle bundle) {
 		super.onCreate(bundle);
@@ -52,7 +53,6 @@ public class KolmapoidActivity extends MapActivity {
 		mapView = (MapView) findViewById(R.id.mapview);
 		mapView.setBuiltInZoomControls(true);
 		mapView.setSatellite(true);
-		projection = mapView.getProjection();
 		mapController = mapView.getController();
 		mapController.setZoom(20); // Zoom 1 is world view
 		locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
@@ -68,10 +68,18 @@ public class KolmapoidActivity extends MapActivity {
 						myLocationOverlay.getMyLocation());
 			}
 		});
-		
+		location = locationManager.getLastKnownLocation(locationManager
+				.getBestProvider(new Criteria(), false));
+		Log.d(TAG, "Current location: " + location.getLatitude() + " "
+				+ location.getLongitude());
+
 		// createMarker();
 		mapView.getOverlays().add(new MyOverlay());
 		updatePlaces();
+	}
+	
+	private GeoPoint getCenter() {
+		return mapView.getProjection().fromPixels(mapView.getWidth()/2, mapView.getHeight()/2);
 	}
 
 	@Override
@@ -87,6 +95,8 @@ public class KolmapoidActivity extends MapActivity {
 			GeoPoint point = new GeoPoint(lat, lng);
 			// createMarker();
 			mapController.animateTo(point); // mapController.setCenter(point);
+			location = locationManager.getLastKnownLocation(locationManager
+					.getBestProvider(new Criteria(), false));
 			updatePlaces();
 		}
 
@@ -113,12 +123,43 @@ public class KolmapoidActivity extends MapActivity {
 		Toast toast = Toast.makeText(this, R.string.start_update,
 				Toast.LENGTH_SHORT);
 		toast.show();
-		Location loc = locationManager.getLastKnownLocation(locationManager
-				.getBestProvider(new Criteria(), false));
-		UpdatePlacesTask task = new UpdatePlacesTask(this, loc.getLatitude(),
-				loc.getLongitude(), 100);
+
+		UpdatePlacesTask task = new UpdatePlacesTask(this,
+				location.getLatitude(), location.getLongitude(), 20);
 		Object params[] = { places, placesLock };
 		task.execute(params);
+	}
+
+	@Override
+	public boolean dispatchTouchEvent(MotionEvent ev) {
+		int actionType = ev.getAction();
+		switch (actionType) {
+		case MotionEvent.ACTION_UP:
+			Projection proj = mapView.getProjection();
+			GeoPoint loc = proj.fromPixels((int) ev.getX(), (int) ev.getY());
+			Log.d(TAG,
+					"X: " + Float.toString(ev.getX()) + " y: "
+							+ Float.toString(ev.getY()));
+			String sirina = Double
+					.toString((double) (loc.getLongitudeE6()) / 1000000.0);
+			String dolzina = Double
+					.toString((double) (loc.getLatitudeE6()) / 1000000.0);
+
+			Log.d(TAG, "Lng: " + sirina + " Lat: " + dolzina);
+			GeoPoint topLeftPoint = mapView.getProjection().fromPixels(0, 0);
+			GeoPoint currentPoint = getCenter();
+			Log.d(TAG, "From " + topLeftPoint + " to " + currentPoint);
+			float radius[] = { 0 };
+			Location.distanceBetween((double) (topLeftPoint.getLatitudeE6())
+					/ (double) (1e6), (double) (topLeftPoint.getLongitudeE6())
+					/ (double) (1e6), (double) (currentPoint.getLatitudeE6())
+					/ (double) (1e6), (double) (currentPoint.getLongitudeE6())
+					/ (double) (1e6), radius);
+			Log.d(TAG, "Distance: " + radius[0]);
+
+		}
+
+		return super.dispatchTouchEvent(ev);
 	}
 
 	@Override
@@ -222,6 +263,13 @@ public class KolmapoidActivity extends MapActivity {
 			try {
 				placesLock.acquire();
 				for (int i = 0; i < places.size(); i++) {
+					GeoPoint topLeftPoint = mapView.getProjection().fromPixels(
+							0, 0);
+					GeoPoint currentPoint = new GeoPoint(
+							(int) (location.getLatitude() * 1e6),
+							(int) (location.getLongitude() * 1e6));
+					// Log.d(TAG, "From " + topLeftPoint + " to " +
+					// currentPoint);
 					Location loc = locationManager
 							.getLastKnownLocation(locationManager
 									.getBestProvider(new Criteria(), false));
@@ -230,12 +278,15 @@ public class KolmapoidActivity extends MapActivity {
 							(int) (loc.getLatitude() * 1e6),
 							(int) (loc.getLongitude() * 1e6));
 					PlaceData place = places.get(i);
+
 					GeoPoint gP2 = new GeoPoint(place.getLattitude6(),
 							place.getLongitude6());
 
 					Point p1 = new Point();
 					Point p2 = new Point();
 					Path path = new Path();
+
+					Projection projection = mapView.getProjection();
 
 					projection.toPixels(gP1, p1);
 					projection.toPixels(gP2, p2);
