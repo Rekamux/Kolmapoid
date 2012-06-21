@@ -28,21 +28,24 @@ public class UpdatePlacesTask extends AsyncTask<Object, Object, Object> {
 	private static final String TAG = "UpdateRatesTask";
 	private static final String KEY = "AIzaSyDpZ0J_YzzI7v_BgzOCIcXnDt-GZi-yZAA";
 	
-	private long lattitude;
-	private long longitude;
+	private double lattitude;
+	private double longitude;
 	private int radius;
 
 	private Context context;
 
-	public UpdatePlacesTask(Context c) {
+	public UpdatePlacesTask(Context c, double la, double lo, int rad) {
 		Log.d(TAG, "Created task");
 		context = c;
+		lattitude = la;
+		longitude = lo;
+		radius = rad;
 	}
 
 	private String generateURL() {
 		return "https://maps.googleapis.com/maps/api/place/search/json?key="
-				+ KEY + "&location=" + Long.toString(lattitude) + ","
-				+ Long.toString(longitude) + "&radius="
+				+ KEY + "&location=" + Double.toString(lattitude) + ","
+				+ Double.toString(longitude) + "&radius="
 				+ Integer.toString(radius) + "&sensor=true";
 	}
 
@@ -97,7 +100,7 @@ public class UpdatePlacesTask extends AsyncTask<Object, Object, Object> {
 
 	@Override
 	protected void onPostExecute(Object result) {
-		Log.d(TAG, "Started task");
+		Log.d(TAG, "Task completed");
 		boolean success = (Boolean) result;
 		if (success) {
 			Toast toast = Toast.makeText(context, R.string.places_update_done,
@@ -112,9 +115,11 @@ public class UpdatePlacesTask extends AsyncTask<Object, Object, Object> {
 
 	@Override
 	protected Object doInBackground(Object... params) {
+		Log.d(TAG, "Do in background");
 		try {
 			JSONArray result = updateJSON();
 			boolean wentWell = true;
+			Log.d(TAG, result.length() + " places found");
 			for (int i=0; i<result.length(); i++) {
 				String placeName = "Unknown place";
 				// Update places list for each result

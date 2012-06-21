@@ -4,7 +4,11 @@ import android.app.AlertDialog;
 import android.app.AlertDialog.Builder;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
 import android.graphics.drawable.Drawable;
+import android.location.Criteria;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
@@ -17,6 +21,7 @@ import com.google.android.maps.MapActivity;
 import com.google.android.maps.MapController;
 import com.google.android.maps.MapView;
 import com.google.android.maps.MyLocationOverlay;
+import com.google.android.maps.Overlay;
 import com.google.android.maps.OverlayItem;
 
 public class KolmapoidActivity extends MapActivity {
@@ -53,7 +58,9 @@ public class KolmapoidActivity extends MapActivity {
 
 		Drawable drawable = this.getResources().getDrawable(R.drawable.point);
 		itemizedoverlay = new MyOverlays(this, drawable);
-		createMarker();
+		//createMarker();
+		mapView.getOverlays().add(new MyOverlay());
+		updatePlaces();
 	}
 
 	@Override
@@ -67,9 +74,9 @@ public class KolmapoidActivity extends MapActivity {
 			int lat = (int) (location.getLatitude() * 1E6);
 			int lng = (int) (location.getLongitude() * 1E6);
 			GeoPoint point = new GeoPoint(lat, lng);
-			createMarker();
+			//createMarker();
 			mapController.animateTo(point); // mapController.setCenter(point);
-			updateRates();
+			updatePlaces();
 		}
 
 		public void onProviderDisabled(String provider) {
@@ -101,11 +108,12 @@ public class KolmapoidActivity extends MapActivity {
 	/**
 	 * Updates places in background
 	 */
-	private void updateRates() {
+	private void updatePlaces() {
 		Toast toast = Toast.makeText(this, R.string.start_update,
 				Toast.LENGTH_SHORT);
 		toast.show();
-		UpdatePlacesTask task = new UpdatePlacesTask(this);
+		Location loc = locationManager.getLastKnownLocation(locationManager.getBestProvider(new Criteria(), false));
+		UpdatePlacesTask task = new UpdatePlacesTask(this, loc.getLatitude(), loc.getLongitude(), 100);
 		Object[] o = null;
 		task.execute(o);
 	}
@@ -188,6 +196,28 @@ public class KolmapoidActivity extends MapActivity {
 				Toast.makeText(context, "You clicked no", Toast.LENGTH_LONG)
 						.show();
 			}
+		}
+
+	}
+
+	class MyOverlay extends Overlay {
+
+		public MyOverlay() {
+
+		}
+
+		public void draw(Canvas canvas, MapView mapv, boolean shadow) {
+			super.draw(canvas, mapv, shadow);
+
+			Paint mPaint = new Paint();
+			mPaint.setDither(true);
+			mPaint.setColor(Color.argb(128, 255, 0, 0));
+			mPaint.setStyle(Paint.Style.FILL_AND_STROKE);
+			mPaint.setStrokeJoin(Paint.Join.ROUND);
+			mPaint.setStrokeCap(Paint.Cap.ROUND);
+			mPaint.setStrokeWidth(2);
+
+			canvas.drawRect(0, 0, canvas.getWidth(), canvas.getHeight(), mPaint);
 		}
 	}
 
