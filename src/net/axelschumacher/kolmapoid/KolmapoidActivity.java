@@ -42,6 +42,7 @@ public class KolmapoidActivity extends MapActivity {
 	private MyLocationOverlay myLocationOverlay;
 	private ArrayList<PlaceData> places;
 	private Semaphore placesLock;
+	private UpdatePlacesTask updatePlacesTask = null;
 
 	public void onCreate(Bundle bundle) {
 		super.onCreate(bundle);
@@ -96,7 +97,7 @@ public class KolmapoidActivity extends MapActivity {
 		GeoPoint topLeftPoint = mapView.getProjection().fromPixels(0, 0);
 		GeoPoint currentPoint = getCenter();
 		int radius = getDistance(topLeftPoint, currentPoint);
-		Log.d(TAG, "Center: "+mapView.getMapCenter());
+		Log.d(TAG, "Center: " + mapView.getMapCenter());
 		Log.d(TAG, "getRadius: " + radius);
 		return radius;
 	}
@@ -139,15 +140,15 @@ public class KolmapoidActivity extends MapActivity {
 	 * Updates places in background
 	 */
 	private void updatePlaces() {
-		Toast toast = Toast.makeText(this, R.string.start_update,
-				Toast.LENGTH_SHORT);
-		toast.show();
-
+		if (updatePlacesTask != null) {
+			updatePlacesTask.cancel(true);
+		}
+		updatePlacesTask = new UpdatePlacesTask(this);
 		GeoPoint center = getCenter();
-		UpdatePlacesTask task = new UpdatePlacesTask(this,
-				center.getLatitudeE6()/1000000.0, center.getLongitudeE6()/1000000.0, getRadius());
-		Object params[] = { places, placesLock };
-		task.execute(params);
+		Object params[] = { places, placesLock,
+				center.getLatitudeE6() / 1000000.0,
+				center.getLongitudeE6() / 1000000.0, getRadius() };
+		updatePlacesTask.execute(params);
 	}
 
 	@Override

@@ -21,7 +21,6 @@ import org.json.JSONTokener;
 import android.content.Context;
 import android.os.AsyncTask;
 import android.util.Log;
-import android.widget.Toast;
 
 /**
  * Update rates in an asynchronous way
@@ -34,14 +33,8 @@ public class UpdatePlacesTask extends AsyncTask<Object, Object, Object> {
 	private double longitude;
 	private int radius;
 
-	private Context context;
-
-	public UpdatePlacesTask(Context c, double la, double lo, int rad) {
+	public UpdatePlacesTask(Context c) {
 		Log.d(TAG, "Created task");
-		context = c;
-		lattitude = la;
-		longitude = lo;
-		radius = rad;
 	}
 
 	private String generateURL() {
@@ -102,16 +95,11 @@ public class UpdatePlacesTask extends AsyncTask<Object, Object, Object> {
 
 	@Override
 	protected void onPostExecute(Object result) {
-		Log.d(TAG, "Task completed");
 		boolean success = (Boolean) result;
 		if (success) {
-			Toast toast = Toast.makeText(context, R.string.places_update_done,
-					Toast.LENGTH_SHORT);
-			toast.show();
+			Log.d(TAG, "Task completed");
 		} else {
-			Toast toast = Toast.makeText(context,
-					R.string.places_update_failed, Toast.LENGTH_LONG);
-			toast.show();
+			Log.d(TAG, "Task aborted");
 		}
 	}
 
@@ -123,6 +111,9 @@ public class UpdatePlacesTask extends AsyncTask<Object, Object, Object> {
 			@SuppressWarnings("unchecked")
 			ArrayList<PlaceData> places = (ArrayList<PlaceData>) params[0];
 			placesLock = (Semaphore) params[1];
+			lattitude = (Double) params[2];
+			longitude = (Double) params[3];
+			radius = (Integer) params[4];
 			placesLock.acquire();
 			places.clear();
 			JSONArray result = updateJSON();
