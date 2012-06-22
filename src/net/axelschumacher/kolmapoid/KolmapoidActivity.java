@@ -7,11 +7,9 @@ import android.app.AlertDialog;
 import android.app.AlertDialog.Builder;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.graphics.Bitmap;
 import android.graphics.Canvas;
-import android.graphics.Color;
 import android.graphics.Paint;
-import android.graphics.Path;
-import android.graphics.Point;
 import android.graphics.drawable.Drawable;
 import android.location.Criteria;
 import android.location.Location;
@@ -30,7 +28,6 @@ import com.google.android.maps.MapView;
 import com.google.android.maps.MyLocationOverlay;
 import com.google.android.maps.Overlay;
 import com.google.android.maps.OverlayItem;
-import com.google.android.maps.Projection;
 
 public class KolmapoidActivity extends MapActivity {
 	private static final String TAG = "KolmapoidActivity";
@@ -43,6 +40,7 @@ public class KolmapoidActivity extends MapActivity {
 	private ArrayList<PlaceData> places;
 	private Semaphore placesLock;
 	private UpdatePlacesTask updatePlacesTask = null;
+	private Bitmap layerPicture = null;
 
 	public void onCreate(Bundle bundle) {
 		super.onCreate(bundle);
@@ -75,7 +73,7 @@ public class KolmapoidActivity extends MapActivity {
 
 		// createMarker();
 		mapView.getOverlays().add(new MyOverlay());
-		updatePlaces();
+
 	}
 
 	private GeoPoint getCenter() {
@@ -109,11 +107,11 @@ public class KolmapoidActivity extends MapActivity {
 	public class GeoUpdateHandler implements LocationListener {
 
 		public void onLocationChanged(Location location) {
-			int lat = (int) (location.getLatitude() * 1E6);
-			int lng = (int) (location.getLongitude() * 1E6);
-			GeoPoint point = new GeoPoint(lat, lng);
+			//int lat = (int) (location.getLatitude() * 1E6);
+			//int lng = (int) (location.getLongitude() * 1E6);
+			//GeoPoint point = new GeoPoint(lat, lng);
 			// createMarker();
-			mapController.animateTo(point); // mapController.setCenter(point);
+			//mapController.animateTo(point); // mapController.setCenter(point);
 			location = locationManager.getLastKnownLocation(locationManager
 					.getBestProvider(new Criteria(), false));
 			updatePlaces();
@@ -139,6 +137,9 @@ public class KolmapoidActivity extends MapActivity {
 	 * Updates places in background
 	 */
 	private void updatePlaces() {
+		layerPicture = Bitmap.createBitmap(mapView.getWidth(),
+				mapView.getHeight(), Bitmap.Config.ARGB_8888);
+
 		if (updatePlacesTask != null) {
 			updatePlacesTask.cancel(true);
 		}
@@ -146,7 +147,8 @@ public class KolmapoidActivity extends MapActivity {
 		GeoPoint center = getCenter();
 		Object params[] = { places, placesLock,
 				center.getLatitudeE6() / 1000000.0,
-				center.getLongitudeE6() / 1000000.0, getRadius() };
+				center.getLongitudeE6() / 1000000.0, getRadius(), mapView, location,
+				layerPicture };
 		updatePlacesTask.execute(params);
 	}
 
@@ -251,44 +253,15 @@ public class KolmapoidActivity extends MapActivity {
 		public void draw(Canvas canvas, MapView mapv, boolean shadow) {
 			super.draw(canvas, mapv, shadow);
 
-			Paint linePaint = new Paint();
-			linePaint.setDither(true);
-			linePaint.setColor(Color.argb(128, 255, 0, 0));
-			linePaint.setStyle(Paint.Style.FILL_AND_STROKE);
-			linePaint.setStrokeJoin(Paint.Join.ROUND);
-			linePaint.setStrokeCap(Paint.Cap.ROUND);
-			linePaint.setStrokeWidth(2);
-			
-			Paint textPaint = new Paint();
-			textPaint.setColor(Color.BLUE);
-			textPaint.setTextSize(20);
-
-			try {
-				placesLock.acquire();
-				for (int i = 0; i < places.size(); i++) {
-					PlaceData place = places.get(i);
-
-					GeoPoint gP1 = place.getGeoPoint();
-					GeoPoint gP2 = getCenter();
-
-					Point p1 = new Point();
-					Point p2 = new Point();
-					Path path = new Path();
-
-					Projection projection = mapView.getProjection();
-
-					projection.toPixels(gP1, p1);
-					projection.toPixels(gP2, p2);
-
-					path.moveTo(p2.x, p2.y);
-					path.lineTo(p1.x, p1.y);
-
-					canvas.drawPath(path, linePaint);
-					canvas.drawText(place.getName(), p1.x, p1.y, textPaint);
-				}
+			if (layerPicture == null) {
+				return;
+			}
+			// Log.d(TAG, "Drawing picture");
+			if (placesLock.tryAcquire()) {
+				//Log.d(TAG, "Height: " + layerPicture.getHeight());
+				canvas.drawBitmap(layerPicture, 0, 0, new Paint());
+				// layerPicture.draw(canvas);
 				placesLock.release();
-			} catch (InterruptedException e) {
-				Log.d(TAG, e.getMessage());
 			}
 		}
 	}

@@ -19,8 +19,19 @@ import org.json.JSONObject;
 import org.json.JSONTokener;
 
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.Point;
+import android.graphics.PointF;
+import android.location.Location;
 import android.os.AsyncTask;
 import android.util.Log;
+
+import com.google.android.maps.GeoPoint;
+import com.google.android.maps.MapView;
+import com.google.android.maps.Projection;
 
 /**
  * Update rates in an asynchronous way
@@ -116,11 +127,33 @@ public class UpdatePlacesTask extends AsyncTask<Object, Object, Object> {
 			lattitude = (Double) params[2];
 			longitude = (Double) params[3];
 			radius = (Integer) params[4];
+			MapView mapv = (MapView) params[5];
+			Location myLocation = (Location) params[6];
+			//int width = mapv.getWidth();
+			//int height = mapv.getHeight();
+			Bitmap picture = (Bitmap) params[7];
+			Canvas canvas = new Canvas(picture);
 			placesLock.acquire();
 			places.clear();
+
+			Paint linePaint = new Paint();
+			linePaint.setDither(true);
+			linePaint.setStrokeWidth(1);
+
+			Paint textPaint = new Paint();
+			textPaint.setColor(Color.BLUE);
+			textPaint.setTextSize(25);
+			textPaint.setStrokeWidth(5);
 			JSONArray result = updateJSON();
 			boolean wentWell = true;
+			Projection projection = mapv.getProjection();
+			int myLat = (int) (myLocation.getLatitude() * 1E6);
+			int myLng = (int) (myLocation.getLongitude() * 1E6);
+			GeoPoint myPoint = new GeoPoint(myLat, myLng);
+			
 			Log.d(TAG, result.length() + " places found");
+			ArrayList<Point> placesPoints = new ArrayList<Point>();
+			placesPoints.add(projection.toPixels(myPoint, null));
 			for (int i = 0; i < result.length(); i++) {
 				String placeName = "Unknown place";
 				// Update places list for each result
@@ -132,7 +165,15 @@ public class UpdatePlacesTask extends AsyncTask<Object, Object, Object> {
 					JSONObject location = geometry.getJSONObject("location");
 					double lat = location.getDouble("lat");
 					double lng = location.getDouble("lng");
-					places.add(new PlaceData(placeName, lat, lng));
+					PlaceData placeData = new PlaceData(placeName, lat, lng);
+					places.add(placeData);
+
+					GeoPoint gP1 = placeData.getGeoPoint();
+					Point p1 = new Point();
+					placesPoints.add(p1);
+					projection.toPixels(gP1, p1);
+					canvas.drawPoint(p1.x, p1.y, textPaint);
+					canvas.drawText(placeName, p1.x, p1.y, textPaint);
 					Log.d(TAG, "Treated " + placeName);
 				} catch (Exception e) {
 					// To keep on getting the other values
@@ -141,7 +182,27 @@ public class UpdatePlacesTask extends AsyncTask<Object, Object, Object> {
 					Log.d(TAG, "Reason: " + e.getMessage());
 				}
 			}
+			int radiusPixel = (int) PointF.length(mapv.getWidth() / 2,
+					mapv.getHeight() / 2);
+			for (int x = 0; x < mapv.getWidth(); x++) {
+				for (int y = 0; y < mapv.getHeight(); y++) {
+					int distance = radiusPixel;
+					for (int i = 0; i < placesPoints.size(); i++) {
+						Point p = placesPoints.get(i);
+						int placeDist = (int) Math.sqrt((p.x - x) * (p.x - x)
+								+ (p.y - y) * (p.y - y));
+						if (distance > placeDist) {
+							distance = placeDist;
+						}
+					}
+					int ratio = distance * 255 / radiusPixel;
+					linePaint.setColor(Color.argb(128, ratio,
+							255 - ratio, 0));
+					canvas.drawPoint(x, y, linePaint);
+				}
+			}
 			placesLock.release();
+			//picture.endRecording();
 			return Boolean.valueOf(wentWell);
 		} catch (Exception e) {
 			if (placesLock != null) {
