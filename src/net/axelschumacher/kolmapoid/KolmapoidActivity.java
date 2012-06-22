@@ -156,7 +156,7 @@ public class KolmapoidActivity extends MapActivity {
 	public boolean dispatchTouchEvent(MotionEvent ev) {
 		int actionType = ev.getAction();
 		switch (actionType) {
-		case MotionEvent.ACTION_UP:
+		case MotionEvent.ACTION_DOWN:
 			updatePlaces();
 		}
 
@@ -257,12 +257,12 @@ public class KolmapoidActivity extends MapActivity {
 				return;
 			}
 			// Log.d(TAG, "Drawing picture");
-			if (placesLock.tryAcquire()) {
+			//if (placesLock.tryAcquire()) {
 				//Log.d(TAG, "Height: " + layerPicture.getHeight());
 				canvas.drawBitmap(layerPicture, 0, 0, new Paint());
 				// layerPicture.draw(canvas);
-				placesLock.release();
-			}
+				//placesLock.release();
+			//}
 		}
 	}
 }

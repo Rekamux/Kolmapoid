@@ -28,6 +28,7 @@ import android.graphics.PointF;
 import android.location.Location;
 import android.os.AsyncTask;
 import android.util.Log;
+import android.widget.Toast;
 
 import com.google.android.maps.GeoPoint;
 import com.google.android.maps.MapView;
@@ -44,9 +45,12 @@ public class UpdatePlacesTask extends AsyncTask<Object, Object, Object> {
 	private double lattitude;
 	private double longitude;
 	private int radius;
+	private MapView mapv;
+	private Context context;
 
 	public UpdatePlacesTask(Context c) {
 		Log.d(TAG, "Created task");
+		context = c;
 	}
 
 	private String generateURL() {
@@ -111,6 +115,10 @@ public class UpdatePlacesTask extends AsyncTask<Object, Object, Object> {
 		boolean success = (Boolean) result;
 		if (success) {
 			Log.d(TAG, "Task completed");
+			mapv.invalidate();
+			Toast toast = Toast.makeText(context, "Update done",
+					Toast.LENGTH_SHORT);
+			toast.show();
 		} else {
 			Log.d(TAG, "Task aborted");
 		}
@@ -127,7 +135,7 @@ public class UpdatePlacesTask extends AsyncTask<Object, Object, Object> {
 			lattitude = (Double) params[2];
 			longitude = (Double) params[3];
 			radius = (Integer) params[4];
-			MapView mapv = (MapView) params[5];
+			mapv = (MapView) params[5];
 			Location myLocation = (Location) params[6];
 			//int width = mapv.getWidth();
 			//int height = mapv.getHeight();
