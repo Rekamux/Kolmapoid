@@ -1,12 +1,10 @@
 package net.axelschumacher.kolmapoid;
 
-import java.util.ArrayList;
 import java.util.concurrent.Semaphore;
 
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
-import android.graphics.Color;
 import android.graphics.Paint;
 import android.location.Criteria;
 import android.location.Location;
@@ -25,7 +23,6 @@ import com.google.android.maps.Overlay;
 
 public class KolmapoidActivity extends MapActivity {
 	private static final String TAG = "KolmapoidActivity";
-	public static final double log10 = Math.log(10);
 	public static final int maxComplexity = 10;
 
 	public MapController mapController;
@@ -33,16 +30,13 @@ public class KolmapoidActivity extends MapActivity {
 	public LocationManager locationManager;
 	public Location location;
 	public MyLocationOverlay myLocationOverlay;
-	public ArrayList<PlaceData> places;
-	public ArrayList<PlaceData> placesToBeDisplayed;
 	public Semaphore placesLock;
 	public UpdatePlacesTask updatePlacesTask = null;
+	public Bitmap bitmapToBeDisplayed = null;
 
 	public void onCreate(Bundle bundle) {
 		super.onCreate(bundle);
 		setContentView(R.layout.main); // bind the layout to the activity
-		places = new ArrayList<PlaceData>();
-		placesToBeDisplayed = new ArrayList<PlaceData>();
 		placesLock = new Semaphore(1);
 
 		// Configure the Map
@@ -168,49 +162,20 @@ public class KolmapoidActivity extends MapActivity {
 
 		public void draw(Canvas bigCanvas, MapView mapv, boolean shadow) {
 			super.draw(bigCanvas, mapv, shadow);
-			Bitmap bitmap = Bitmap.createBitmap(mapv.getWidth(), mapv.getHeight(), Bitmap.Config.ARGB_4444);
-			Canvas canvas = new Canvas(bitmap);
-			int radius = mapView.getHeight() / 2;
-
-			Paint paint = new Paint();
-			paint.setStyle(Paint.Style.FILL);
-
-			Paint textPaint = new Paint();
-			textPaint.setColor(Color.BLUE);
-			textPaint.setTextSize(25);
-			textPaint.setStrokeWidth(5);
-
-			// Draw the color circles
-			for (int i = 0; i < 10; i++) {
-				int distanceBits = 10 - i;
-				Log.d(TAG, "Circle " + i + " bits " + distanceBits);
-				for (int j = 0; j < placesToBeDisplayed.size(); j++) {
-					PlaceData place = placesToBeDisplayed.get(j);
-					int complexity = place.getNbBits() + distanceBits;
-					int ratio = complexity * 255 / maxComplexity;
-					Log.d(TAG, "Complexity: "+complexity+" ratio: "+ratio);
-					paint.setColor(Color.rgb(ratio, 255 - ratio, 0));
-					canvas.drawCircle(place.getX(), place.getY(), radius
-							/ (i+1), paint);
-				}
+			
+			if (bitmapToBeDisplayed == null) {
+				return;
 			}
 
-			// Draw the places
 			try {
 				placesLock.acquire();
-				for (int i = 0; i < placesToBeDisplayed.size(); i++) {
-					PlaceData place = placesToBeDisplayed.get(i);
-					canvas.drawPoint(place.getX(), place.getY(), textPaint);
-					canvas.drawText(place.getName(), place.getX(), place.getY(),
-							textPaint);
-				}
+				Paint bigPaint = new Paint();
+				bigPaint.setAlpha(100);
+				bigCanvas.drawBitmap(bitmapToBeDisplayed, 0, 0, bigPaint);
 				placesLock.release();
 			} catch (InterruptedException e) {
 				Log.d(TAG, e.getMessage());
 			}
-			Paint bigPaint = new Paint();
-			bigPaint.setAlpha(100);
-			bigCanvas.drawBitmap(bitmap, 0, 0, bigPaint);
 		}
 	}
 }
