@@ -12,20 +12,22 @@ public class PlaceData {
 	private String name;
 	private double lattitude;
 	private double longitude;
+	private int x;
+	private int y;
+	private int nbBits;
 
-	public PlaceData(String name, double lattitude, double longitude) {
+	public PlaceData(String name, double lattitude, double longitude, int x, int y, int n) {
 		super();
 		this.name = name;
 		this.lattitude = lattitude;
 		this.longitude = longitude;
+		this.x = x;
+		this.y = y;
+		this.nbBits = n;
 	}
 
 	public String getName() {
 		return name;
-	}
-
-	public void setName(String name) {
-		this.name = name;
 	}
 
 	public double getLattitude() {
@@ -36,10 +38,6 @@ public class PlaceData {
 		return (int) (lattitude * 1e6);
 	}
 
-	public void setLattitude(double lattitude) {
-		this.lattitude = lattitude;
-	}
-
 	public double getLongitude() {
 		return longitude;
 	}
@@ -48,12 +46,19 @@ public class PlaceData {
 		return (int) (longitude * 1e6);
 	}
 
-	public void setLongitude(double longitude) {
-		this.longitude = longitude;
-	}
-
 	public GeoPoint getGeoPoint() {
 		return new GeoPoint(getLattitude6(), getLongitude6());
 	}
 
+	public int getX() {
+		return x;
+	}
+
+	public int getY() {
+		return y;
+	}
+	
+	public int getNbBits() {
+		return nbBits;
+	}
 }

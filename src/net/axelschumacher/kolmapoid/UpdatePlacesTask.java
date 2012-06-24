@@ -18,13 +18,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import org.json.JSONTokener;
 
-import android.content.Context;
-import android.graphics.Bitmap;
-import android.graphics.Canvas;
-import android.graphics.Color;
-import android.graphics.Paint;
 import android.graphics.Point;
-import android.graphics.PointF;
 import android.location.Location;
 import android.os.AsyncTask;
 import android.util.Log;
@@ -42,18 +36,18 @@ public class UpdatePlacesTask extends AsyncTask<Object, Object, Object> {
 	private static final String KEY = "AIzaSyDpZ0J_YzzI7v_BgzOCIcXnDt-GZi-yZAA";
 	private String language = "fr";
 
-	private double lattitude;
-	private double longitude;
-	private int radius;
-	private MapView mapv;
-	private Context context;
+	private KolmapoidActivity activity;
 
-	public UpdatePlacesTask(Context c) {
+	public UpdatePlacesTask(KolmapoidActivity a) {
 		Log.d(TAG, "Created task");
-		context = c;
+		activity = a;
 	}
 
 	private String generateURL() {
+		GeoPoint center = activity.getCenter();
+		double lattitude = center.getLatitudeE6() / 1000000.0;
+		double longitude = center.getLongitudeE6() / 1000000.0;
+		int radius = activity.getRadius();
 		return "https://maps.googleapis.com/maps/api/place/search/json?key="
 				+ KEY + "&location=" + Double.toString(lattitude) + ","
 				+ Double.toString(longitude) + "&radius="
@@ -115,8 +109,8 @@ public class UpdatePlacesTask extends AsyncTask<Object, Object, Object> {
 		boolean success = (Boolean) result;
 		if (success) {
 			Log.d(TAG, "Task completed");
-			mapv.invalidate();
-			Toast toast = Toast.makeText(context, "Update done",
+			activity.mapView.invalidate();
+			Toast toast = Toast.makeText(activity, "Update done",
 					Toast.LENGTH_SHORT);
 			toast.show();
 		} else {
@@ -129,39 +123,26 @@ public class UpdatePlacesTask extends AsyncTask<Object, Object, Object> {
 		Log.d(TAG, "Do in background");
 		Semaphore placesLock = null;
 		try {
-			@SuppressWarnings("unchecked")
-			ArrayList<PlaceData> places = (ArrayList<PlaceData>) params[0];
-			placesLock = (Semaphore) params[1];
-			lattitude = (Double) params[2];
-			longitude = (Double) params[3];
-			radius = (Integer) params[4];
-			mapv = (MapView) params[5];
-			Location myLocation = (Location) params[6];
-			//int width = mapv.getWidth();
-			//int height = mapv.getHeight();
-			Bitmap picture = (Bitmap) params[7];
-			Canvas canvas = new Canvas(picture);
-			placesLock.acquire();
+			ArrayList<PlaceData> places = activity.places;
+			placesLock = activity.placesLock;
+			MapView mapv = activity.mapView;
+			Location myLocation = activity.location;
+
 			places.clear();
 
-			Paint linePaint = new Paint();
-			linePaint.setDither(true);
-			linePaint.setStrokeWidth(1);
-
-			Paint textPaint = new Paint();
-			textPaint.setColor(Color.BLUE);
-			textPaint.setTextSize(25);
-			textPaint.setStrokeWidth(5);
 			JSONArray result = updateJSON();
 			boolean wentWell = true;
+
+			// Add my position
 			Projection projection = mapv.getProjection();
 			int myLat = (int) (myLocation.getLatitude() * 1E6);
 			int myLng = (int) (myLocation.getLongitude() * 1E6);
 			GeoPoint myPoint = new GeoPoint(myLat, myLng);
-			
-			Log.d(TAG, result.length() + " places found");
-			ArrayList<Point> placesPoints = new ArrayList<Point>();
-			placesPoints.add(projection.toPixels(myPoint, null));
+			Point p = new Point();
+			projection.toPixels(myPoint, p);
+			places.add(new PlaceData("My position", myLat, myLng, p.x, p.y, 0));
+/*
+			Log.d(TAG, result.length() + 1 + " places found");
 			for (int i = 0; i < result.length(); i++) {
 				String placeName = "Unknown place";
 				// Update places list for each result
@@ -169,19 +150,18 @@ public class UpdatePlacesTask extends AsyncTask<Object, Object, Object> {
 					JSONObject place = result.getJSONObject(i);
 					placeName = place.getString("name");
 					Log.d(TAG, "Treating place " + placeName);
+					int nbBits = (int) (Math.log(i + 1) / KolmapoidActivity.log10 + 1);
+					Log.d(TAG, "Nb bits: "+nbBits);
 					JSONObject geometry = place.getJSONObject("geometry");
 					JSONObject location = geometry.getJSONObject("location");
 					double lat = location.getDouble("lat");
 					double lng = location.getDouble("lng");
-					PlaceData placeData = new PlaceData(placeName, lat, lng);
+					GeoPoint gP = new GeoPoint((int) (lat * 1e6),
+							(int) (lng * 1e6));
+					projection.toPixels(gP, p);
+					PlaceData placeData = new PlaceData(placeName, lat, lng,
+							p.x, p.y, nbBits);
 					places.add(placeData);
-
-					GeoPoint gP1 = placeData.getGeoPoint();
-					Point p1 = new Point();
-					placesPoints.add(p1);
-					projection.toPixels(gP1, p1);
-					canvas.drawPoint(p1.x, p1.y, textPaint);
-					canvas.drawText(placeName, p1.x, p1.y, textPaint);
 					Log.d(TAG, "Treated " + placeName);
 				} catch (Exception e) {
 					// To keep on getting the other values
@@ -190,27 +170,12 @@ public class UpdatePlacesTask extends AsyncTask<Object, Object, Object> {
 					Log.d(TAG, "Reason: " + e.getMessage());
 				}
 			}
-			int radiusPixel = (int) PointF.length(mapv.getWidth() / 2,
-					mapv.getHeight() / 2);
-			for (int x = 0; x < mapv.getWidth(); x++) {
-				for (int y = 0; y < mapv.getHeight(); y++) {
-					int distance = radiusPixel;
-					for (int i = 0; i < placesPoints.size(); i++) {
-						Point p = placesPoints.get(i);
-						int placeDist = (int) Math.sqrt((p.x - x) * (p.x - x)
-								+ (p.y - y) * (p.y - y));
-						if (distance > placeDist) {
-							distance = placeDist;
-						}
-					}
-					int ratio = distance * 255 / radiusPixel;
-					linePaint.setColor(Color.argb(128, ratio,
-							255 - ratio, 0));
-					canvas.drawPoint(x, y, linePaint);
-				}
-			}
+			*/
+			// Swap maps
+			placesLock.acquire();
+			activity.placesToBeDisplayed = new ArrayList<PlaceData>(places);
 			placesLock.release();
-			//picture.endRecording();
+
 			return Boolean.valueOf(wentWell);
 		} catch (Exception e) {
 			if (placesLock != null) {

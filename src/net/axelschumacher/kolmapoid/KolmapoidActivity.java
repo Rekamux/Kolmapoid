@@ -3,14 +3,11 @@ package net.axelschumacher.kolmapoid;
 import java.util.ArrayList;
 import java.util.concurrent.Semaphore;
 
-import android.app.AlertDialog;
-import android.app.AlertDialog.Builder;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.Paint;
-import android.graphics.drawable.Drawable;
 import android.location.Criteria;
 import android.location.Location;
 import android.location.LocationListener;
@@ -18,34 +15,34 @@ import android.location.LocationManager;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.MotionEvent;
-import android.widget.Toast;
 
 import com.google.android.maps.GeoPoint;
-import com.google.android.maps.ItemizedOverlay;
 import com.google.android.maps.MapActivity;
 import com.google.android.maps.MapController;
 import com.google.android.maps.MapView;
 import com.google.android.maps.MyLocationOverlay;
 import com.google.android.maps.Overlay;
-import com.google.android.maps.OverlayItem;
 
 public class KolmapoidActivity extends MapActivity {
 	private static final String TAG = "KolmapoidActivity";
+	public static final double log10 = Math.log(10);
+	public static final int maxComplexity = 10;
 
-	private MapController mapController;
-	private MapView mapView;
-	private LocationManager locationManager;
-	private Location location;
-	private MyLocationOverlay myLocationOverlay;
-	private ArrayList<PlaceData> places;
-	private Semaphore placesLock;
-	private UpdatePlacesTask updatePlacesTask = null;
-	private Bitmap layerPicture = null;
+	public MapController mapController;
+	public MapView mapView;
+	public LocationManager locationManager;
+	public Location location;
+	public MyLocationOverlay myLocationOverlay;
+	public ArrayList<PlaceData> places;
+	public ArrayList<PlaceData> placesToBeDisplayed;
+	public Semaphore placesLock;
+	public UpdatePlacesTask updatePlacesTask = null;
 
 	public void onCreate(Bundle bundle) {
 		super.onCreate(bundle);
 		setContentView(R.layout.main); // bind the layout to the activity
 		places = new ArrayList<PlaceData>();
+		placesToBeDisplayed = new ArrayList<PlaceData>();
 		placesLock = new Semaphore(1);
 
 		// Configure the Map
@@ -76,7 +73,7 @@ public class KolmapoidActivity extends MapActivity {
 
 	}
 
-	private GeoPoint getCenter() {
+	public GeoPoint getCenter() {
 		return mapView.getMapCenter();
 	}
 
@@ -90,7 +87,7 @@ public class KolmapoidActivity extends MapActivity {
 		return (int) (distance[0]);
 	}
 
-	private int getRadius() {
+	public int getRadius() {
 		GeoPoint topLeftPoint = mapView.getProjection().fromPixels(0, 0);
 		GeoPoint currentPoint = getCenter();
 		int radius = getDistance(topLeftPoint, currentPoint);
@@ -107,11 +104,12 @@ public class KolmapoidActivity extends MapActivity {
 	public class GeoUpdateHandler implements LocationListener {
 
 		public void onLocationChanged(Location location) {
-			//int lat = (int) (location.getLatitude() * 1E6);
-			//int lng = (int) (location.getLongitude() * 1E6);
-			//GeoPoint point = new GeoPoint(lat, lng);
+			// int lat = (int) (location.getLatitude() * 1E6);
+			// int lng = (int) (location.getLongitude() * 1E6);
+			// GeoPoint point = new GeoPoint(lat, lng);
 			// createMarker();
-			//mapController.animateTo(point); // mapController.setCenter(point);
+			// mapController.animateTo(point); //
+			// mapController.setCenter(point);
 			location = locationManager.getLastKnownLocation(locationManager
 					.getBestProvider(new Criteria(), false));
 			updatePlaces();
@@ -137,19 +135,12 @@ public class KolmapoidActivity extends MapActivity {
 	 * Updates places in background
 	 */
 	private void updatePlaces() {
-		layerPicture = Bitmap.createBitmap(mapView.getWidth(),
-				mapView.getHeight(), Bitmap.Config.ARGB_8888);
 
 		if (updatePlacesTask != null) {
 			updatePlacesTask.cancel(true);
 		}
 		updatePlacesTask = new UpdatePlacesTask(this);
-		GeoPoint center = getCenter();
-		Object params[] = { places, placesLock,
-				center.getLatitudeE6() / 1000000.0,
-				center.getLongitudeE6() / 1000000.0, getRadius(), mapView, location,
-				layerPicture };
-		updatePlacesTask.execute(params);
+		updatePlacesTask.execute((Object[]) (null));
 	}
 
 	@Override
@@ -169,100 +160,57 @@ public class KolmapoidActivity extends MapActivity {
 		myLocationOverlay.disableMyLocation();
 	}
 
-	private static int maxNum = 5;
-
-	public class MyOverlays extends ItemizedOverlay<OverlayItem> {
-
-		private OverlayItem overlays[] = new OverlayItem[maxNum];
-		private int index = 0;
-		private boolean full = false;
-		private Context context;
-		private OverlayItem previousoverlay;
-
-		public MyOverlays(Context context, Drawable defaultMarker) {
-			super(boundCenterBottom(defaultMarker));
-			this.context = context;
-		}
-
-		@Override
-		protected OverlayItem createItem(int i) {
-			return overlays[i];
-		}
-
-		@Override
-		public int size() {
-			if (full) {
-				return overlays.length;
-			} else {
-				return index;
-			}
-
-		}
-
-		public void addOverlay(OverlayItem overlay) {
-			if (previousoverlay != null) {
-				if (index < maxNum) {
-					overlays[index] = previousoverlay;
-				} else {
-					index = 0;
-					full = true;
-					overlays[index] = previousoverlay;
-				}
-				index++;
-				populate();
-			}
-			this.previousoverlay = overlay;
-		}
-
-		protected boolean onTap(int index) {
-			// OverlayItem overlayItem = overlays[index];
-			Builder builder = new AlertDialog.Builder(context);
-			builder.setMessage("This will end the activity");
-			builder.setCancelable(true);
-			builder.setPositiveButton("I agree", new OkOnClickListener());
-			builder.setNegativeButton("No, no", new CancelOnClickListener());
-			AlertDialog dialog = builder.create();
-			dialog.show();
-			return true;
-		};
-
-		private final class CancelOnClickListener implements
-				DialogInterface.OnClickListener {
-			public void onClick(DialogInterface dialog, int which) {
-				Toast.makeText(context, "You clicked yes", Toast.LENGTH_LONG)
-						.show();
-			}
-		}
-
-		private final class OkOnClickListener implements
-				DialogInterface.OnClickListener {
-			public void onClick(DialogInterface dialog, int which) {
-				Toast.makeText(context, "You clicked no", Toast.LENGTH_LONG)
-						.show();
-			}
-		}
-
-	}
-
 	class MyOverlay extends Overlay {
 
 		public MyOverlay() {
 
 		}
 
-		public void draw(Canvas canvas, MapView mapv, boolean shadow) {
-			super.draw(canvas, mapv, shadow);
+		public void draw(Canvas bigCanvas, MapView mapv, boolean shadow) {
+			super.draw(bigCanvas, mapv, shadow);
+			Bitmap bitmap = Bitmap.createBitmap(mapv.getWidth(), mapv.getHeight(), Bitmap.Config.ARGB_4444);
+			Canvas canvas = new Canvas(bitmap);
+			int radius = mapView.getHeight() / 2;
 
-			if (layerPicture == null) {
-				return;
+			Paint paint = new Paint();
+			paint.setStyle(Paint.Style.FILL);
+
+			Paint textPaint = new Paint();
+			textPaint.setColor(Color.BLUE);
+			textPaint.setTextSize(25);
+			textPaint.setStrokeWidth(5);
+
+			// Draw the color circles
+			for (int i = 0; i < 10; i++) {
+				int distanceBits = 10 - i;
+				Log.d(TAG, "Circle " + i + " bits " + distanceBits);
+				for (int j = 0; j < placesToBeDisplayed.size(); j++) {
+					PlaceData place = placesToBeDisplayed.get(j);
+					int complexity = place.getNbBits() + distanceBits;
+					int ratio = complexity * 255 / maxComplexity;
+					Log.d(TAG, "Complexity: "+complexity+" ratio: "+ratio);
+					paint.setColor(Color.rgb(ratio, 255 - ratio, 0));
+					canvas.drawCircle(place.getX(), place.getY(), radius
+							/ (i+1), paint);
+				}
 			}
-			// Log.d(TAG, "Drawing picture");
-			//if (placesLock.tryAcquire()) {
-				//Log.d(TAG, "Height: " + layerPicture.getHeight());
-				canvas.drawBitmap(layerPicture, 0, 0, new Paint());
-				// layerPicture.draw(canvas);
-				//placesLock.release();
-			//}
+
+			// Draw the places
+			try {
+				placesLock.acquire();
+				for (int i = 0; i < placesToBeDisplayed.size(); i++) {
+					PlaceData place = placesToBeDisplayed.get(i);
+					canvas.drawPoint(place.getX(), place.getY(), textPaint);
+					canvas.drawText(place.getName(), place.getX(), place.getY(),
+							textPaint);
+				}
+				placesLock.release();
+			} catch (InterruptedException e) {
+				Log.d(TAG, e.getMessage());
+			}
+			Paint bigPaint = new Paint();
+			bigPaint.setAlpha(100);
+			bigCanvas.drawBitmap(bitmap, 0, 0, bigPaint);
 		}
 	}
 }
