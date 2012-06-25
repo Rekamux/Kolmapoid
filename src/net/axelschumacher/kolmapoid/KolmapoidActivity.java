@@ -5,7 +5,9 @@ import java.util.concurrent.Semaphore;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Point;
 import android.location.Criteria;
 import android.location.Location;
 import android.location.LocationListener;
@@ -21,6 +23,7 @@ import com.google.android.maps.MapController;
 import com.google.android.maps.MapView;
 import com.google.android.maps.MyLocationOverlay;
 import com.google.android.maps.Overlay;
+import com.google.android.maps.Projection;
 
 public class KolmapoidActivity extends MapActivity {
 	private static final String TAG = "KolmapoidActivity";
@@ -34,6 +37,7 @@ public class KolmapoidActivity extends MapActivity {
 	public Semaphore placesLock;
 	public UpdatePlacesTask updatePlacesTask = null;
 	public Bitmap bitmapToBeDisplayed = null;
+	public GeoPoint center = null;
 
 	public void onCreate(Bundle bundle) {
 		super.onCreate(bundle);
@@ -118,7 +122,7 @@ public class KolmapoidActivity extends MapActivity {
 		public void onStatusChanged(String provider, int status, Bundle extras) {
 		}
 	}
-	
+
 	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
 		super.onCreateOptionsMenu(menu);
@@ -152,6 +156,7 @@ public class KolmapoidActivity extends MapActivity {
 		if (updatePlacesTask != null) {
 			updatePlacesTask.cancel(true);
 		}
+		center = getCenter();
 		updatePlacesTask = new UpdatePlacesTask(this);
 		updatePlacesTask.execute((Object[]) (null));
 	}
@@ -170,19 +175,40 @@ public class KolmapoidActivity extends MapActivity {
 
 		public void draw(Canvas bigCanvas, MapView mapv, boolean shadow) {
 			super.draw(bigCanvas, mapv, shadow);
-			
+
 			if (bitmapToBeDisplayed == null) {
 				return;
 			}
 
-			try {
-				placesLock.acquire();
-				Paint bigPaint = new Paint();
-				bigPaint.setAlpha(100);
-				bigCanvas.drawBitmap(bitmapToBeDisplayed, 0, 0, bigPaint);
-				placesLock.release();
-			} catch (InterruptedException e) {
-				Log.d(TAG, e.getMessage());
+			if (center == null) {
+				return;
+			}
+
+			Projection projection = mapv.getProjection();
+
+			Point pC = new Point();
+			projection.toPixels(center, pC);
+			GeoPoint actualCenter = getCenter();
+			Point pAC = new Point();
+			projection.toPixels(actualCenter, pAC);
+			if ((pC.x - pAC.x) * (pC.x - pAC.x) + (pC.y - pAC.y)
+					* (pC.y - pAC.y) < 500) {
+				try {
+					placesLock.acquire();
+					Paint bigPaint = new Paint();
+					bigPaint.setAlpha(100);
+					bigCanvas.drawBitmap(bitmapToBeDisplayed, 0, 0, bigPaint);
+					placesLock.release();
+				} catch (InterruptedException e) {
+					Log.d(TAG, e.getMessage());
+				}
+			}
+			else {
+				Paint paint = new Paint();
+				paint.setColor(Color.RED);
+				paint.setTextSize(25);
+				bigCanvas.drawCircle(pC.x, pC.y, 5, paint);
+				bigCanvas.drawText("Center me !", pC.x+5, pC.y, paint);
 			}
 		}
 	}
