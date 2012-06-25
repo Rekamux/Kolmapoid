@@ -12,7 +12,8 @@ import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.MotionEvent;
+import android.view.Menu;
+import android.view.MenuItem;
 
 import com.google.android.maps.GeoPoint;
 import com.google.android.maps.MapActivity;
@@ -106,7 +107,6 @@ public class KolmapoidActivity extends MapActivity {
 			// mapController.setCenter(point);
 			location = locationManager.getLastKnownLocation(locationManager
 					.getBestProvider(new Criteria(), false));
-			updatePlaces();
 		}
 
 		public void onProviderDisabled(String provider) {
@@ -117,6 +117,25 @@ public class KolmapoidActivity extends MapActivity {
 
 		public void onStatusChanged(String provider, int status, Bundle extras) {
 		}
+	}
+	
+	@Override
+	public boolean onCreateOptionsMenu(Menu menu) {
+		super.onCreateOptionsMenu(menu);
+
+		menu.add(0, 0, 0, "Search places");
+
+		return true;
+	}
+
+	@Override
+	public boolean onOptionsItemSelected(MenuItem item) {
+		switch (item.getItemId()) {
+		case 0:
+			updatePlaces();
+			return true;
+		}
+		return super.onOptionsItemSelected(item);
 	}
 
 	@Override
@@ -135,17 +154,6 @@ public class KolmapoidActivity extends MapActivity {
 		}
 		updatePlacesTask = new UpdatePlacesTask(this);
 		updatePlacesTask.execute((Object[]) (null));
-	}
-
-	@Override
-	public boolean dispatchTouchEvent(MotionEvent ev) {
-		int actionType = ev.getAction();
-		switch (actionType) {
-		case MotionEvent.ACTION_DOWN:
-			updatePlaces();
-		}
-
-		return super.dispatchTouchEvent(ev);
 	}
 
 	@Override

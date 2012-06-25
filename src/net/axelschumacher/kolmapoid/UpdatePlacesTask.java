@@ -38,7 +38,8 @@ import com.google.android.maps.Projection;
  */
 public class UpdatePlacesTask extends AsyncTask<Object, Object, Object> {
 	private static final String TAG = "UpdateRatesTask";
-	private static final String KEY = "AIzaSyDpZ0J_YzzI7v_BgzOCIcXnDt-GZi-yZAA";
+	//private static final String KEY = "AIzaSyDpZ0J_YzzI7v_BgzOCIcXnDt-GZi-yZAA";
+	private static final String KEY = "AIzaSyBTqZWHSLWf58WV6UWSJZBeDC-fcEVeFzw";
 	private String language = "fr";
 	public static final double log2 = Math.log(2);
 
